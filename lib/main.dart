@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:chess/chess.dart' as chess;
 import 'dart:math' as math;
+import 'dart:async';
 
 void main() {
   runApp(const ChessApp());
@@ -34,6 +35,11 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
   String? selectedSquare;
   List<String> validDestinations = [];
 
+  Timer? _gameTimer;
+  int _whiteTime = 0;
+  int _blackTime = 0;
+  bool _gameStarted = false;
+
   // Unicode mapping - using solid shapes with \uFE0E to force text presentation (prevents emoji fallback)
   static const Map<String, String> pieceUnicodes = {
     'k': '♚\uFE0E', 'q': '♛\uFE0E', 'r': '♜\uFE0E', 'b': '♝\uFE0E', 'n': '♞\uFE0E', 'p': '♟\uFE0E',
@@ -45,11 +51,44 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     game = chess.Chess();
   }
 
+  @override
+  void dispose() {
+    _gameTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _gameStarted = true;
+    _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (game.game_over) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (game.turn == chess.Color.WHITE) {
+          _whiteTime++;
+        } else {
+          _blackTime++;
+        }
+      });
+    });
+  }
+
+  String _formatTime(int totalSeconds) {
+    int minutes = totalSeconds ~/ 60;
+    int seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   void _resetGame() {
+    _gameTimer?.cancel();
     setState(() {
       game = chess.Chess();
       selectedSquare = null;
       validDestinations = [];
+      _gameStarted = false;
+      _whiteTime = 0;
+      _blackTime = 0;
     });
   }
 
@@ -87,6 +126,9 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       final moveSuccess = game.move(moveObj);
 
       if (moveSuccess) {
+        if (!_gameStarted) {
+          _startTimer();
+        }
         setState(() {
           selectedSquare = null;
           validDestinations = [];
@@ -157,6 +199,9 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         final moveSuccess = game.move(moveObj);
 
         if (moveSuccess) {
+          if (!_gameStarted) {
+            _startTimer();
+          }
           setState(() {
             selectedSquare = null;
             validDestinations = [];
@@ -282,6 +327,54 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
 
         return dialogContent;
       },
+    );
+  }
+
+  Widget _buildTimerCard({required bool isActive, required int timeInSeconds, required bool isWhite}) {
+    final displayTime = _formatTime(timeInSeconds);
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isActive 
+            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+            : colorScheme.surfaceVariant.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isActive 
+              ? colorScheme.primary 
+              : colorScheme.outline.withValues(alpha: 0.2),
+          width: 2,
+        ),
+        boxShadow: isActive ? [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.2),
+            blurRadius: 8,
+            spreadRadius: 1,
+          )
+        ] : [],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.circle,
+            size: 12,
+            color: isActive ? Colors.greenAccent : Colors.grey,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isWhite ? "White: $displayTime" : "Black: $displayTime",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+              color: isActive ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -420,6 +513,30 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         child: checkIndicator,
       );
     }
+
+    Widget blackTimer = _buildTimerCard(
+      isActive: _gameStarted && !game.game_over && game.turn == chess.Color.BLACK,
+      timeInSeconds: _blackTime,
+      isWhite: false,
+    );
+    if (!isWhiteTurn) {
+      blackTimer = RotatedBox(
+        quarterTurns: 2,
+        child: blackTimer,
+      );
+    }
+
+    Widget whiteTimer = _buildTimerCard(
+      isActive: _gameStarted && !game.game_over && game.turn == chess.Color.WHITE,
+      timeInSeconds: _whiteTime,
+      isWhite: true,
+    );
+    if (!isWhiteTurn) {
+      whiteTimer = RotatedBox(
+        quarterTurns: 2,
+        child: whiteTimer,
+      );
+    }
     
     return Scaffold(
       appBar: AppBar(
@@ -447,6 +564,8 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
                 ),
                 if (isCheck) checkIndicator,
                 const SizedBox(height: 16),
+                blackTimer,
+                const SizedBox(height: 16),
                 Flexible(
                   flex: 6,
                   child: Padding(
@@ -456,6 +575,8 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                whiteTimer,
                 const Spacer(flex: 2),
               ],
             ),
