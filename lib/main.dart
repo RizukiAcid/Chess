@@ -36,9 +36,11 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
   List<String> validDestinations = [];
 
   Timer? _gameTimer;
-  int _whiteTime = 0;
-  int _blackTime = 0;
+  int _selectedMinutes = 5;
+  int _whiteTime = 300;
+  int _blackTime = 300;
   bool _gameStarted = false;
+  bool _isTimeOut = false;
 
   // Unicode mapping - using solid shapes with \uFE0E to force text presentation (prevents emoji fallback)
   static const Map<String, String> pieceUnicodes = {
@@ -66,9 +68,15 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       }
       setState(() {
         if (game.turn == chess.Color.WHITE) {
-          _whiteTime++;
+          if (_whiteTime > 0) _whiteTime--;
         } else {
-          _blackTime++;
+          if (_blackTime > 0) _blackTime--;
+        }
+        
+        if (_whiteTime <= 0 || _blackTime <= 0) {
+          timer.cancel();
+          _isTimeOut = true;
+          _showTimeoutDialog(_whiteTime <= 0 ? "White" : "Black");
         }
       });
     });
@@ -87,15 +95,16 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       selectedSquare = null;
       validDestinations = [];
       _gameStarted = false;
-      _whiteTime = 0;
-      _blackTime = 0;
+      _isTimeOut = false;
+      _whiteTime = _selectedMinutes * 60;
+      _blackTime = _selectedMinutes * 60;
     });
   }
 
   String get _turnText => game.turn == chess.Color.WHITE ? "White's Turn" : "Black's Turn";
 
   void _handleDragMove(String from, String to) async {
-    if (game.game_over) return;
+    if (game.game_over || _isTimeOut) return;
     if (from == to) return;
     
     final piece = game.get(from);
@@ -142,7 +151,7 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
   }
 
   void _onSquareTap(String square) async {
-    if (game.game_over) return;
+    if (game.game_over || _isTimeOut) return;
 
     if (selectedSquare == null) {
       final piece = game.get(square);
@@ -307,6 +316,38 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         Widget dialogContent = AlertDialog(
           title: const Text('Game Over'),
           content: Text(message),
+          actions: [
+            TextButton(
+              child: const Text('Play Again'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetGame();
+              },
+            ),
+          ],
+        );
+
+        if (game.turn == chess.Color.BLACK) {
+           dialogContent = RotatedBox(
+            quarterTurns: 2,
+            child: dialogContent,
+          );
+        }
+
+        return dialogContent;
+      },
+    );
+  }
+
+  void _showTimeoutDialog(String loser) {
+    String winner = loser == "White" ? "Black" : "White";
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        Widget dialogContent = AlertDialog(
+          title: const Text('Time\'s Up!'),
+          content: Text('$loser ran out of time. $winner wins!'),
           actions: [
             TextButton(
               child: const Text('Play Again'),
@@ -543,6 +584,30 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         title: const Text('Local Chess'),
         centerTitle: true,
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: DropdownButton<int>(
+              value: _selectedMinutes,
+              icon: const Icon(Icons.timer),
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              underline: const SizedBox(),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('1 min')),
+                DropdownMenuItem(value: 3, child: Text('3 min')),
+                DropdownMenuItem(value: 5, child: Text('5 min')),
+                DropdownMenuItem(value: 10, child: Text('10 min')),
+              ],
+              onChanged: _gameStarted ? null : (int? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedMinutes = newValue;
+                    _whiteTime = newValue * 60;
+                    _blackTime = newValue * 60;
+                  });
+                }
+              },
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _resetGame,
