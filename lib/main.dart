@@ -487,8 +487,10 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         padding: const EdgeInsets.all(8.0),
         child: Text(
           pieceUnicodes[pieceKey]!,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 40,
+            height: 1.0,
             color: isWhite ? Colors.white : Colors.black,
             fontFamily: 'Segoe UI Symbol',
             fontFamilyFallback: const [
@@ -675,41 +677,18 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
               pieceColor = piece.color == chess.Color.WHITE ? Colors.white : Colors.black;
             }
 
-            Widget pieceWidget;
-            if (piece != null && piece.type.toString().toLowerCase() == 'p') {
-              pieceWidget = SizedBox(
-                key: ValueKey('piece_pawn_${square}_${piece.color}'),
-                width: 40,
-                height: 40,
-                child: CustomPaint(
-                  painter: ChessPawnPainter(
-                    color: piece.color == chess.Color.WHITE ? Colors.white : Colors.black,
-                  ),
-                ),
-              );
-            } else if (pieceText.isNotEmpty) {
-              pieceWidget = Text(
-                pieceText,
-                key: ValueKey('piece_text_${square}_${piece?.type}_${piece?.color}'),
-                style: TextStyle(
-                  fontSize: 40,
-                  color: pieceColor,
-                  fontFamily: 'Segoe UI Symbol',
-                  fontFamilyFallback: const [
-                    'Apple Symbols',
-                    'DejaVu Sans',
-                    'Noto Sans Symbols',
-                    'FreeSans',
-                    'sans-serif',
-                  ],
-                  shadows: const [
-                    Shadow(color: Colors.grey, blurRadius: 2, offset: Offset(1, 1))
-                  ]
-                ),
-              );
-            } else {
-              pieceWidget = const SizedBox.shrink();
-            }
+            Widget pieceWidget = pieceText.isNotEmpty ? Text(
+              pieceText,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 40,
+                height: 1.0,
+                color: pieceColor,
+                shadows: const [
+                  Shadow(color: Colors.grey, blurRadius: 2, offset: Offset(1, 1))
+                ]
+              ),
+            ) : const SizedBox.shrink();
 
             // Flip pieces for the current player
             if (!isWhiteTurn && pieceText.isNotEmpty) {
