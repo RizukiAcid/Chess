@@ -32,7 +32,25 @@ class MainMenuScreen extends StatefulWidget {
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
   bool _isCountDown = false;
-  int _selectedMinutes = 5;
+  int _selectedSeconds = 300;
+
+  String _formatTime(int totalSeconds) {
+    int minutes = totalSeconds ~/ 60;
+    int seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  int? _parseCustomTime(String text) {
+    final parts = text.split(':');
+    if (parts.length != 2) return null;
+    final minutes = int.tryParse(parts[0].trim());
+    final seconds = int.tryParse(parts[1].trim());
+    if (minutes == null || seconds == null) return null;
+    if (minutes < 0 || seconds < 0 || seconds >= 60) return null;
+    final totalSeconds = minutes * 60 + seconds;
+    if (totalSeconds <= 0) return null;
+    return totalSeconds;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,18 +91,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         const Text('Select Duration:', style: TextStyle(fontSize: 20)),
                         const SizedBox(height: 10),
                         DropdownButton<int>(
-                          value: [1, 3, 5, 10].contains(_selectedMinutes) ? _selectedMinutes : -1,
+                          value: [60, 180, 300, 600].contains(_selectedSeconds) ? _selectedSeconds : -1,
                           items: [
-                            const DropdownMenuItem(value: 1, child: Text('1 min', style: TextStyle(fontSize: 18))),
-                            const DropdownMenuItem(value: 3, child: Text('3 min', style: TextStyle(fontSize: 18))),
-                            const DropdownMenuItem(value: 5, child: Text('5 min', style: TextStyle(fontSize: 18))),
-                            const DropdownMenuItem(value: 10, child: Text('10 min', style: TextStyle(fontSize: 18))),
+                            const DropdownMenuItem(value: 60, child: Text('1 min', style: TextStyle(fontSize: 18))),
+                            const DropdownMenuItem(value: 180, child: Text('3 min', style: TextStyle(fontSize: 18))),
+                            const DropdownMenuItem(value: 300, child: Text('5 min', style: TextStyle(fontSize: 18))),
+                            const DropdownMenuItem(value: 600, child: Text('10 min', style: TextStyle(fontSize: 18))),
                             DropdownMenuItem(
                               value: -1, 
                               child: Text(
-                                [1, 3, 5, 10].contains(_selectedMinutes) 
+                                [60, 180, 300, 600].contains(_selectedSeconds) 
                                     ? 'Custom...' 
-                                    : 'Custom ($_selectedMinutes min)', 
+                                    : 'Custom (${_formatTime(_selectedSeconds)})', 
                                 style: const TextStyle(fontSize: 18)
                               )
                             ),
@@ -95,42 +113,57 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                 context: context,
                                 builder: (context) {
                                   final TextEditingController controller = TextEditingController(
-                                    text: _selectedMinutes.toString()
+                                    text: _formatTime(_selectedSeconds)
                                   );
-                                  return AlertDialog(
-                                    title: const Text('Custom Timer'),
-                                    content: TextField(
-                                      controller: controller,
-                                      keyboardType: TextInputType.number,
-                                      autofocus: true,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Minutes',
-                                        suffixText: 'min',
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          final int? val = int.tryParse(controller.text);
-                                          if (val != null && val > 0) {
-                                            Navigator.pop(context, val);
-                                          }
-                                        },
-                                        child: const Text('OK'),
-                                      ),
-                                    ],
+                                  String? errorMessage;
+                                  return StatefulBuilder(
+                                    builder: (context, setDialogState) {
+                                      return AlertDialog(
+                                        title: const Text('Custom Timer'),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            TextField(
+                                              controller: controller,
+                                              keyboardType: TextInputType.datetime,
+                                              autofocus: true,
+                                              decoration: InputDecoration(
+                                                labelText: 'Duration (MM:SS)',
+                                                hintText: 'e.g. 01:30',
+                                                errorText: errorMessage,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              final int? val = _parseCustomTime(controller.text);
+                                              if (val != null) {
+                                                Navigator.pop(context, val);
+                                              } else {
+                                                setDialogState(() {
+                                                  errorMessage = 'Invalid format. Use MM:SS (e.g., 01:30)';
+                                                });
+                                              }
+                                            },
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      );
+                                    }
                                   );
                                 }
                               );
                               if (custom != null) {
-                                setState(() => _selectedMinutes = custom);
+                                setState(() => _selectedSeconds = custom);
                               }
                             } else if (value != null) {
-                              setState(() => _selectedMinutes = value);
+                              setState(() => _selectedSeconds = value);
                             }
                           },
                         ),
@@ -144,7 +177,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   MaterialPageRoute(
                     builder: (context) => ChessGameScreen(
                       isCountDown: _isCountDown,
-                      selectedMinutes: _selectedMinutes,
+                      selectedSeconds: _selectedSeconds,
                     ),
                   ),
                 );
@@ -167,12 +200,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
 class ChessGameScreen extends StatefulWidget {
   final bool isCountDown;
-  final int selectedMinutes;
+  final int selectedSeconds;
 
   const ChessGameScreen({
     super.key,
     required this.isCountDown,
-    required this.selectedMinutes,
+    required this.selectedSeconds,
   });
 
   @override
@@ -200,8 +233,8 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     super.initState();
     game = chess.Chess();
     if (widget.isCountDown) {
-      _whiteTime = widget.selectedMinutes * 60;
-      _blackTime = widget.selectedMinutes * 60;
+      _whiteTime = widget.selectedSeconds;
+      _blackTime = widget.selectedSeconds;
     } else {
       _whiteTime = 0;
       _blackTime = 0;
@@ -260,8 +293,8 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       _gameStarted = false;
       _isTimeOut = false;
       if (widget.isCountDown) {
-        _whiteTime = widget.selectedMinutes * 60;
-        _blackTime = widget.selectedMinutes * 60;
+        _whiteTime = widget.selectedSeconds;
+        _blackTime = widget.selectedSeconds;
       } else {
         _whiteTime = 0;
         _blackTime = 0;
