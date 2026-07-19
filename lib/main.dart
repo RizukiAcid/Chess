@@ -490,6 +490,14 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
           style: TextStyle(
             fontSize: 40,
             color: isWhite ? Colors.white : Colors.black,
+            fontFamily: 'Segoe UI Symbol',
+            fontFamilyFallback: const [
+              'Apple Symbols',
+              'DejaVu Sans',
+              'Noto Sans Symbols',
+              'FreeSans',
+              'sans-serif',
+            ],
             shadows: const [
               Shadow(color: Colors.grey, blurRadius: 2)
             ]
@@ -667,16 +675,41 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
               pieceColor = piece.color == chess.Color.WHITE ? Colors.white : Colors.black;
             }
 
-            Widget pieceWidget = pieceText.isNotEmpty ? Text(
-              pieceText,
-              style: TextStyle(
-                fontSize: 40,
-                color: pieceColor,
-                shadows: const [
-                  Shadow(color: Colors.grey, blurRadius: 2, offset: Offset(1, 1))
-                ]
-              ),
-            ) : const SizedBox.shrink();
+            Widget pieceWidget;
+            if (piece != null && piece.type.toString().toLowerCase() == 'p') {
+              pieceWidget = SizedBox(
+                key: ValueKey('piece_pawn_${square}_${piece.color}'),
+                width: 40,
+                height: 40,
+                child: CustomPaint(
+                  painter: ChessPawnPainter(
+                    color: piece.color == chess.Color.WHITE ? Colors.white : Colors.black,
+                  ),
+                ),
+              );
+            } else if (pieceText.isNotEmpty) {
+              pieceWidget = Text(
+                pieceText,
+                key: ValueKey('piece_text_${square}_${piece?.type}_${piece?.color}'),
+                style: TextStyle(
+                  fontSize: 40,
+                  color: pieceColor,
+                  fontFamily: 'Segoe UI Symbol',
+                  fontFamilyFallback: const [
+                    'Apple Symbols',
+                    'DejaVu Sans',
+                    'Noto Sans Symbols',
+                    'FreeSans',
+                    'sans-serif',
+                  ],
+                  shadows: const [
+                    Shadow(color: Colors.grey, blurRadius: 2, offset: Offset(1, 1))
+                  ]
+                ),
+              );
+            } else {
+              pieceWidget = const SizedBox.shrink();
+            }
 
             // Flip pieces for the current player
             if (!isWhiteTurn && pieceText.isNotEmpty) {
@@ -691,6 +724,7 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
               child: Center(
                 child: pieceText.isNotEmpty && piece?.color == game.turn
                   ? Draggable<String>(
+                      key: ValueKey('draggable_${square}_${piece?.type}_${piece?.color}'),
                       data: square,
                       feedback: Material(
                         color: Colors.transparent,
@@ -707,6 +741,7 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
             );
 
             return DragTarget<String>(
+              key: ValueKey('drag_target_$square'),
               onWillAcceptWithDetails: (details) => true,
               onAcceptWithDetails: (details) {
                 _handleDragMove(details.data, square);
@@ -835,3 +870,67 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     );
   }
 }
+
+class ChessPawnPainter extends CustomPainter {
+  final Color color;
+  const ChessPawnPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = Colors.grey.shade400
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    double w = size.width;
+    double h = size.height;
+
+    // Draw base
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.25, h * 0.75, w * 0.5, h * 0.1),
+        const Radius.circular(3),
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.25, h * 0.75, w * 0.5, h * 0.1),
+        const Radius.circular(3),
+      ),
+      borderPaint,
+    );
+
+    // Draw body/pedestal
+    final bodyPath = Path()
+      ..moveTo(w * 0.32, h * 0.75)
+      ..cubicTo(w * 0.37, h * 0.55, w * 0.42, h * 0.45, w * 0.44, h * 0.42)
+      ..lineTo(w * 0.56, h * 0.42)
+      ..cubicTo(w * 0.58, h * 0.45, w * 0.63, h * 0.55, w * 0.68, h * 0.75)
+      ..close();
+    canvas.drawPath(bodyPath, paint);
+    canvas.drawPath(bodyPath, borderPaint);
+
+    // Draw collar
+    canvas.drawOval(
+      Rect.fromLTWH(w * 0.38, h * 0.4, w * 0.24, h * 0.05),
+      paint,
+    );
+    canvas.drawOval(
+      Rect.fromLTWH(w * 0.38, h * 0.4, w * 0.24, h * 0.05),
+      borderPaint,
+    );
+
+    // Draw head
+    canvas.drawCircle(Offset(w * 0.5, h * 0.28), w * 0.15, paint);
+    canvas.drawCircle(Offset(w * 0.5, h * 0.28), w * 0.15, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
