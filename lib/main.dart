@@ -487,8 +487,10 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         padding: const EdgeInsets.all(8.0),
         child: Text(
           pieceUnicodes[pieceKey]!,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 40,
+            height: 1.0,
             color: isWhite ? Colors.white : Colors.black,
             shadows: const [
               Shadow(color: Colors.grey, blurRadius: 2)
@@ -669,8 +671,10 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
 
             Widget pieceWidget = pieceText.isNotEmpty ? Text(
               pieceText,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 40,
+                height: 1.0,
                 color: pieceColor,
                 shadows: const [
                   Shadow(color: Colors.grey, blurRadius: 2, offset: Offset(1, 1))
