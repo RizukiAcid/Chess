@@ -18,13 +18,162 @@ class ChessApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown, brightness: Brightness.dark),
         useMaterial3: true,
       ),
-      home: const ChessGameScreen(),
+      home: const MainMenuScreen(),
+    );
+  }
+}
+
+class MainMenuScreen extends StatefulWidget {
+  const MainMenuScreen({super.key});
+
+  @override
+  State<MainMenuScreen> createState() => _MainMenuScreenState();
+}
+
+class _MainMenuScreenState extends State<MainMenuScreen> {
+  bool _isCountDown = false;
+  int _selectedMinutes = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Local Chess'), centerTitle: true),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Select Timer Mode:', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ChoiceChip(
+                  label: const Padding(padding: EdgeInsets.all(8.0), child: Text('Count Up', style: TextStyle(fontSize: 18))),
+                  selected: !_isCountDown,
+                  onSelected: (selected) {
+                    if (selected) setState(() => _isCountDown = false);
+                  },
+                ),
+                const SizedBox(width: 20),
+                ChoiceChip(
+                  label: const Padding(padding: EdgeInsets.all(8.0), child: Text('Count Down', style: TextStyle(fontSize: 18))),
+                  selected: _isCountDown,
+                  onSelected: (selected) {
+                    if (selected) setState(() => _isCountDown = true);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 40),
+            SizedBox(
+              height: 120,
+              child: _isCountDown 
+                  ? Column(
+                      children: [
+                        const Text('Select Duration:', style: TextStyle(fontSize: 20)),
+                        const SizedBox(height: 10),
+                        DropdownButton<int>(
+                          value: [1, 3, 5, 10].contains(_selectedMinutes) ? _selectedMinutes : -1,
+                          items: [
+                            const DropdownMenuItem(value: 1, child: Text('1 min', style: TextStyle(fontSize: 18))),
+                            const DropdownMenuItem(value: 3, child: Text('3 min', style: TextStyle(fontSize: 18))),
+                            const DropdownMenuItem(value: 5, child: Text('5 min', style: TextStyle(fontSize: 18))),
+                            const DropdownMenuItem(value: 10, child: Text('10 min', style: TextStyle(fontSize: 18))),
+                            DropdownMenuItem(
+                              value: -1, 
+                              child: Text(
+                                [1, 3, 5, 10].contains(_selectedMinutes) 
+                                    ? 'Custom...' 
+                                    : 'Custom ($_selectedMinutes min)', 
+                                style: const TextStyle(fontSize: 18)
+                              )
+                            ),
+                          ],
+                          onChanged: (value) async {
+                            if (value == -1) {
+                              final int? custom = await showDialog<int>(
+                                context: context,
+                                builder: (context) {
+                                  final TextEditingController controller = TextEditingController(
+                                    text: _selectedMinutes.toString()
+                                  );
+                                  return AlertDialog(
+                                    title: const Text('Custom Timer'),
+                                    content: TextField(
+                                      controller: controller,
+                                      keyboardType: TextInputType.number,
+                                      autofocus: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Minutes',
+                                        suffixText: 'min',
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          final int? val = int.tryParse(controller.text);
+                                          if (val != null && val > 0) {
+                                            Navigator.pop(context, val);
+                                          }
+                                        },
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  );
+                                }
+                              );
+                              if (custom != null) {
+                                setState(() => _selectedMinutes = custom);
+                              }
+                            } else if (value != null) {
+                              setState(() => _selectedMinutes = value);
+                            }
+                          },
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ChessGameScreen(
+                      isCountDown: _isCountDown,
+                      selectedMinutes: _selectedMinutes,
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                child: Text('Start Game', style: TextStyle(fontSize: 20)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class ChessGameScreen extends StatefulWidget {
-  const ChessGameScreen({super.key});
+  final bool isCountDown;
+  final int selectedMinutes;
+
+  const ChessGameScreen({
+    super.key,
+    required this.isCountDown,
+    required this.selectedMinutes,
+  });
 
   @override
   State<ChessGameScreen> createState() => _ChessGameScreenState();
@@ -36,9 +185,8 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
   List<String> validDestinations = [];
 
   Timer? _gameTimer;
-  int _selectedMinutes = 5;
-  int _whiteTime = 300;
-  int _blackTime = 300;
+  late int _whiteTime;
+  late int _blackTime;
   bool _gameStarted = false;
   bool _isTimeOut = false;
 
@@ -51,6 +199,13 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
   void initState() {
     super.initState();
     game = chess.Chess();
+    if (widget.isCountDown) {
+      _whiteTime = widget.selectedMinutes * 60;
+      _blackTime = widget.selectedMinutes * 60;
+    } else {
+      _whiteTime = 0;
+      _blackTime = 0;
+    }
   }
 
   @override
@@ -67,16 +222,24 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         return;
       }
       setState(() {
-        if (game.turn == chess.Color.WHITE) {
-          if (_whiteTime > 0) _whiteTime--;
+        if (widget.isCountDown) {
+          if (game.turn == chess.Color.WHITE) {
+            if (_whiteTime > 0) _whiteTime--;
+          } else {
+            if (_blackTime > 0) _blackTime--;
+          }
+          
+          if (_whiteTime <= 0 || _blackTime <= 0) {
+            timer.cancel();
+            _isTimeOut = true;
+            _showTimeoutDialog(_whiteTime <= 0 ? "White" : "Black");
+          }
         } else {
-          if (_blackTime > 0) _blackTime--;
-        }
-        
-        if (_whiteTime <= 0 || _blackTime <= 0) {
-          timer.cancel();
-          _isTimeOut = true;
-          _showTimeoutDialog(_whiteTime <= 0 ? "White" : "Black");
+          if (game.turn == chess.Color.WHITE) {
+            _whiteTime++;
+          } else {
+            _blackTime++;
+          }
         }
       });
     });
@@ -96,8 +259,13 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       validDestinations = [];
       _gameStarted = false;
       _isTimeOut = false;
-      _whiteTime = _selectedMinutes * 60;
-      _blackTime = _selectedMinutes * 60;
+      if (widget.isCountDown) {
+        _whiteTime = widget.selectedMinutes * 60;
+        _blackTime = widget.selectedMinutes * 60;
+      } else {
+        _whiteTime = 0;
+        _blackTime = 0;
+      }
     });
   }
 
@@ -583,31 +751,14 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       appBar: AppBar(
         title: const Text('Local Chess'),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          tooltip: 'Back to Menu',
+        ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: DropdownButton<int>(
-              value: _selectedMinutes,
-              icon: const Icon(Icons.timer),
-              dropdownColor: Theme.of(context).colorScheme.surface,
-              underline: const SizedBox(),
-              items: const [
-                DropdownMenuItem(value: 1, child: Text('1 min')),
-                DropdownMenuItem(value: 3, child: Text('3 min')),
-                DropdownMenuItem(value: 5, child: Text('5 min')),
-                DropdownMenuItem(value: 10, child: Text('10 min')),
-              ],
-              onChanged: _gameStarted ? null : (int? newValue) {
-                if (newValue != null) {
-                  setState(() {
-                    _selectedMinutes = newValue;
-                    _whiteTime = newValue * 60;
-                    _blackTime = newValue * 60;
-                  });
-                }
-              },
-            ),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _resetGame,
